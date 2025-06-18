@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: solove-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: solove_user
+      POSTGRES_PASSWORD: pwd
+      POSTGRES_DB: solove
+    volumes:
+      - solove-pgdata:/var/lib/postgresql/data
+volumes:
+  solove-pgdata:
