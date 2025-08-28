@@ -8,8 +8,7 @@ public class SoloveApiApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(SoloveApiApplication.class, args);
+		
 	}
 
 }
-
-
