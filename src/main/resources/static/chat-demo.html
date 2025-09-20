@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solove Chat Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #007AFF;
+            color: white;
+            padding: 16px;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .message {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background: #007AFF;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .assistant-message {
+            background: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+        .chat-input {
+            display: flex;
+            padding: 16px;
+            gap: 12px;
+        }
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 20px;
+            outline: none;
+            font-size: 16px;
+        }
+        .message-input:focus {
+            border-color: #007AFF;
+        }
+        .send-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .send-button:hover {
+            background: #0056cc;
+        }
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .auth-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .token-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .status {
+            padding: 8px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Solove Chat Demo</h1>
+
+    <div class="auth-section">
+        <h3>Test Mode</h3>
+        <div id="auth-status" class="status success">Ready to chat! Using test user.</div>
+        <button onclick="startNewSession()">Start New Session</button>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Chat with Sol</h2>
+            <div id="session-info">No active session</div>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message assistant-message">
+                Hi! I'm Sol, your mental health companion. How are you feeling today?
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" class="message-input" placeholder="Type your message..."
+                   onkeypress="handleKeyPress(event)">
+            <button id="send-button" class="send-button" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+
+        async function startNewSession() {
+            try {
+                const response = await fetch('/api/v1/chat/sessions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                if (response.ok) {
+                    const session = await response.json();
+                    currentSessionId = session.id;
+                    document.getElementById('session-info').innerHTML = `Session: ${session.id.substring(0, 8)}...`;
+                } else {
+                    const error = await response.text();
+                    addSystemMessage(`Failed to start session: ${response.status} ${error}`);
+                }
+            } catch (error) {
+                addSystemMessage(`Error starting session: ${error.message}`);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+
+            if (!message || !currentSessionId) return;
+
+            addUserMessage(message);
+            input.value = '';
+
+            const sendButton = document.getElementById('send-button');
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending...';
+
+            try {
+                const response = await fetch(`/api/v1/chat/sessions/${currentSessionId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    addAssistantMessage(result.response);
+                } else {
+                    const error = await response.text();
+                    addSystemMessage(`Error: ${response.status} ${error}`);
+                }
+            } catch (error) {
+                addSystemMessage(`Network error: ${error.message}`);
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = 'Send';
+                input.focus();
+            }
+        }
+
+        function addUserMessage(text) {
+            addMessage(text, 'user-message');
+        }
+
+        function addAssistantMessage(text) {
+            addMessage(text, 'assistant-message');
+        }
+
+        function addSystemMessage(text) {
+            addMessage(`System: ${text}`, 'assistant-message');
+        }
+
+        function addMessage(text, className) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('message-input').focus();
+        });
+    </script>
+</body>
+</html>
